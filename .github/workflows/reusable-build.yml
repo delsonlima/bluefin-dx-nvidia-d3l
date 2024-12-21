@@ -3,7 +3,7 @@ name: build-ublue-custom
 on:
   workflow_call:
     inputs:
-      base_image_name:
+      base_image:
         description: "Fully qualified name of the base image: 'registry.example.com/username/image:tag'"
         type: string
       base_image_digest:
@@ -84,7 +84,7 @@ jobs:
             org.opencontainers.image.description=${{ env.MY_IMAGE_DESC }}
             org.opencontainers.image.title=${{ env.MY_IMAGE_NAME }}
             org.opencontainers.image.base.digest=${{ inputs.base_image_digest }}
-            org.opencontainers.image.base.name=${{ inputs.base_image_name }}
+            org.opencontainers.image.base.name=${{ inputs.base_image }}
 
       # Build image using Buildah action
       - name: Build Image
@@ -94,7 +94,7 @@ jobs:
           containerfiles: |
             ./Containerfile
           build-args: |
-            BASE_IMAGE=${{ inputs.base_image_name }}
+            BASE_IMAGE=${{ inputs.base_image }}
           # Postfix image name with -custom to make it a little more descriptive
           # Syntax: https://docs.github.com/en/actions/learn-github-actions/expressions#format
           image: ${{ env.MY_IMAGE_NAME }}
