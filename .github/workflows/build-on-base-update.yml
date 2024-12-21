@@ -1,5 +1,5 @@
 ---
-name: scan-bluefin-stable
+name: Build on updates in base image or local repository
 on:
   schedule:
     - cron: '05 10 * * *'  # 10:05am UTC everyday
@@ -8,6 +8,11 @@ on:
       - main
     paths-ignore:
       - '**/README.md'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
   workflow_dispatch:
   workflow_call:
 
@@ -49,5 +54,5 @@ jobs:
     secrets: inherit
     uses: ./.github/workflows/reusable-build.yml
     with:
-      base_image_name: ${{ env.BASE_IMAGE_NAME }}
-      base_image_digest: ${{ steps.get-base-image-info.outputs.base_image_digest }}
+      base_image_name: "${{ env.BASE_IMAGE_REGISTRY }}/${{ env.BASE_IMAGE_NAME }}"
+      base_image_digest: "${{ steps.get-base-image-info.outputs.base_image_digest }}"
