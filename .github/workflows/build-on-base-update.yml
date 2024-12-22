@@ -1,5 +1,5 @@
 ---
-name: scan-bluefin-stable
+name: Build on updates in base image or local repository
 on:
   schedule:
     - cron: '05 10 * * *'  # 10:05am UTC everyday
@@ -8,46 +8,51 @@ on:
       - main
     paths-ignore:
       - '**/README.md'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
   workflow_dispatch:
   workflow_call:
 
 env:
-  BASE_IMAGE_REGISTRY: "ghcr.io/ublue-os"
-  BASE_IMAGE_NAME: "bluefin-dx-nvidia:stable"
-  MY_IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
-  MY_IMAGE_NAME: "${{ github.event.repository.name }}"  # the name of the image produced by this build, matches repo names
+  BASE_IMAGE: "ghcr.io/ublue-os/bluefin-dx-nvidia:stable"
+  MY_IMAGE: "ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest"
 
 jobs:
   get-images-info:
     name: image
     runs-on: ubuntu-24.04
     continue-on-error: false
+    outputs:
+      base_image: ${{ env.BASE_IMAGE }}
+      base_image_digest: ${{ steps.get-base-image-info.outputs.base_image_digest }}
+      my_image_base_digest: ${{ steps.get-my-image-info.outputs.my_image_base_digest }}
     steps:
       - name: Get latest image info
         id: get-my-image-info
         shell: bash
         run: |
-          my_image_name=${{ env.MY_IMAGE_REGISTRY }}/${{ env.MY_IMAGE_NAME }}
-          my_image_base_digest=$(skopeo list-tags docker://${my_image_name} | jq -r '.Digest')
+          my_image_base_digest=$(skopeo inspect docker://${{ env.MY_IMAGE }} | jq -r '.Labels["org.opencontainers.image.base.digest"]')
 
-          echo "my_image_base_digest=${my_image_digest}" >> $GITHUB_OUTPUT
-
+          echo "my_image_base_digest=${my_image_base_digest}" >> $GITHUB_OUTPUT
       - name: Get base image info
         id: get-base-image-info
         shell: bash
         run: |
-          base_image_name=${{ env.BASE_IMAGE_REGISTRY }}/${{ env.BASE_IMAGE_NAME }}
-          base_image_digest=$(skopeo list-tags docker://${base_image_name} | jq -r '.Digest')
+          base_image_digest=$(skopeo inspect docker://${{ env.BASE_IMAGE }} | jq -r '.Digest')
 
           echo "base_image_digest=${base_image_digest}" >> $GITHUB_OUTPUT
 
   run-build-workflow:
     name: Call build workflow
+    needs: [get-images-info]
     if: |
       (github.event_name != 'schedule') ||
-      (steps.get-my-image-info.outputs.my_image_base_digest != steps.get-base-image-info.outputs.base_image_digest)
+      (needs.get-images-info.outputs.my_image_base_digest != needs.get-images-info.outputs.base_image_digest)
     secrets: inherit
     uses: ./.github/workflows/reusable-build.yml
     with:
-      base_image_name: ${{ env.BASE_IMAGE_NAME }}
-      base_image_digest: ${{ steps.get-base-image-info.outputs.base_image_digest }}
+      base_image: ${{ needs.get-images-info.outputs.base_image }}
+      base_image_digest: ${{ needs.get-images-info.outputs.base_image_digest }}
